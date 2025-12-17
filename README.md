@@ -274,10 +274,10 @@ You can also modify the camera path in the `create_input.py` file.
 ```bash
 cd HunyuanWorld-Voyager
 
-python3 sample_image2video.py \
+python sample_image2video.py \
     --model HYVideo-T/2 \
-    --input-path "examples/case1" \
-    --prompt "An old-fashioned European village with thatched roofs on the houses." \
+    --input-path "examples/case3" \
+    --prompt "In the Mountainous Vista scene, the rolling hills and expansive forest create a serene and majestic landscape under a vast, cloudy sky." \
     --i2v-stability \
     --infer-steps 50 \
     --flow-reverse \
