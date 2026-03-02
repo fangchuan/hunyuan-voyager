@@ -50,12 +50,12 @@ def add_train_denoise_schedule_args(parser: argparse.ArgumentParser):
     """
     group = parser.add_argument_group(title="Denoise schedule")
 
-    group.add_argument("--flow-path-type", type=str, default="linear", choices=FLOW_PATH_TYPE, help="Path type for flow matching schedulers.")
-    group.add_argument("--flow-predict-type", type=str, default="velocity", choices=FLOW_PREDICT_TYPE, help="Prediction type for flow matching schedulers.")
-    group.add_argument("--flow-loss-weight", type=str, default=None, choices=FLOW_LOSS_WEIGHT, help="Loss weight type for flow matching schedulers.")
-    group.add_argument("--flow-train-eps", type=float, default=None, help="Small epsilon for avoiding instability during training.")
-    group.add_argument("--flow-sample-eps", type=float, default=None, help="Small epsilon for avoiding instability during sampling.")
-    group.add_argument("--flow-snr-type", type=str, default="lognorm", choices=FLOW_SNR_TYPE, help="Type of SNR to use for flow matching schedulers.")
+    group.add_argument("--flow_path_type", type=str, default="linear", choices=FLOW_PATH_TYPE, help="Path type for flow matching schedulers.")
+    group.add_argument("--flow_predict_type", type=str, default="velocity", choices=FLOW_PREDICT_TYPE, help="Prediction type for flow matching schedulers.")
+    group.add_argument("--flow_loss_weight", type=str, default=None, choices=FLOW_LOSS_WEIGHT, help="Loss weight type for flow matching schedulers.")
+    group.add_argument("--flow_train_eps", type=float, default=None, help="Small epsilon for avoiding instability during training.")
+    group.add_argument("--flow_sample_eps", type=float, default=None, help="Small epsilon for avoiding instability during sampling.")
+    group.add_argument("--flow_snr_type", type=str, default="lognorm", choices=FLOW_SNR_TYPE, help="Type of SNR to use for flow matching schedulers.")
 
     return parser
 
@@ -70,7 +70,7 @@ def add_deepspeed_args(parser: argparse.ArgumentParser):
 
     group.add_argument("--local_rank", type=int, default=-1, help="Local rank for distributed training.")
     group.add_argument(
-        "--zero-stage",
+        "--zero_stage",
         type=int,
         default=0,
         choices=[0, 1, 2, 3],
@@ -87,15 +87,15 @@ def add_data_args(parser: argparse.ArgumentParser):
     """
     group = parser.add_argument_group(title="Data")
 
-    group.add_argument("--data-type", type=str, default="image", choices=DATA_TYPE, help="Type of the dataset.")
-    group.add_argument("--data-jsons-path", type=str, default=None, help="Dataset path for training.")
-    group.add_argument("--sample-n-frames", type=int, default=65, help="How many frames to sample from a video. if using 3d vae, the number should be 4n+1")
-    group.add_argument("--sample-stride", type=int, default=1, help="How many frames to skip when sampling from a video.")
-    group.add_argument("--num-workers", type=int, default=4, help="Number of workers for data loading.")
-    group.add_argument("--prefetch-factor", type=int, default=2, help="Prefetch factor for data loading.")
-    group.add_argument("--same-data-batch", action="store_true", help="Use same data type for all rank in a batch for training.")
-    group.add_argument("--uncond-p", type=float, default=0.1, help="Probability of randomly dropping video description.")
-    group.add_argument("--sematic-cond-drop-p", type=float, default=0.1, help="Probability of randomly dropping img condition description.")
+    group.add_argument("--data_type", type=str, default="image", choices=DATA_TYPE, help="Type of the dataset.")
+    group.add_argument("--data_jsons_path", type=str, default=None, help="Dataset path for training.")
+    group.add_argument("--sample_n_frames", type=int, default=65, help="How many frames to sample from a video. if using 3d vae, the number should be 4n+1")
+    group.add_argument("--sample_stride", type=int, default=1, help="How many frames to skip when sampling from a video.")
+    group.add_argument("--num_workers", type=int, default=4, help="Number of workers for data loading.")
+    group.add_argument("--prefetch_factor", type=int, default=2, help="Prefetch factor for data loading.")
+    group.add_argument("--same_data_batch", action="store_true", help="Use same data type for all rank in a batch for training.")
+    group.add_argument("--uncond_p", type=float, default=0.1, help="Probability of randomly dropping video description.")
+    group.add_argument("--sematic_cond_drop_p", type=float, default=0.1, help="Probability of randomly dropping img condition description.")
 
     return parser
 
@@ -108,20 +108,20 @@ def add_training_args(parser: argparse.ArgumentParser):
     """
     group = parser.add_argument_group(title="Training")
 
-    group.add_argument("--task-flag", type=str, required=True, help="Task flag for training/inference. It is used to determine the experiment directory.")
-    group.add_argument("--output-dir", type=str, required=True, help="Directory to save logs and models")
-    group.add_argument("--sample-dir", type=str, default=None, required=False, help="Directory to save samples")
-    group.add_argument("--micro-batch-size", type=int, default=1, nargs="*", help="Batch size per model instance (local batch size).")
-    group.add_argument("--video-micro-batch-size", type=int, default=None, nargs="*", help="Batch size per model instance (local batch size).")
+    group.add_argument("--task_flag", type=str, required=True, help="Task flag for training/inference. It is used to determine the experiment directory.")
+    group.add_argument("--output_dir", type=str, required=True, help="Directory to save logs and models")
+    group.add_argument("--sample_dir", type=str, default=None, required=False, help="Directory to save samples")
+    group.add_argument("--micro_batch_size", type=int, default=1, nargs="*", help="Batch size per model instance (local batch size).")
+    group.add_argument("--video_micro_batch_size", type=int, default=None, nargs="*", help="Batch size per model instance (local batch size).")
     group.add_argument(
-        "--global-batch-size",
+        "--global_batch_size",
         type=int,
         default=None,
         nargs="*",
         help="Global batch size (across all model instances). " "global-batch-size = micro-batch-size * world-size * gradient-accumulation-steps",
     )
-    group.add_argument("--gradient-accumulation-steps", type=int, default=1, help="Number of steps to accumulate gradients over before performing an update.")
-    group.add_argument("--global-seed", type=int, default=42, help="Global seed for reproducibility.")
+    group.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Number of steps to accumulate gradients over before performing an update.")
+    group.add_argument("--global_seed", type=int, default=42, help="Global seed for reproducibility.")
 
     # Checkpoint and model loading arguments
     group.add_argument(
@@ -130,24 +130,24 @@ def add_training_args(parser: argparse.ArgumentParser):
         default=None,
         help="Path to the checkpoint to resume training. It can be an experiment index to resume from " "the latest checkpoint in the output directory.",
     )
-    group.add_argument("--init-from", type=str, default=None, help="Path to the checkpoint to load from init ckpt for training. ")
-    group.add_argument("--training-parts", type=str, default=None, help="Training a subset of the model parameters.")
-    group.add_argument("--init-save", action="store_true", help="Save the initial model before training.")
+    group.add_argument("--init_from", type=str, default=None, help="Path to the checkpoint to load from init ckpt for training. ")
+    group.add_argument("--training_parts", type=str, default=None, help="Training a subset of the model parameters.")
+    group.add_argument("--init_save", action="store_true", help="Save the initial model before training.")
     group.set_defaults(final_save=True)
-    group.add_argument("--final-save", action="store_true", help="Save the final model after training.")
-    group.add_argument("--no-final-save", dest="final_save", action="store_false", help="Do not save the final model.")
+    group.add_argument("--final_save", action="store_true", help="Save the final model after training.")
+    group.add_argument("--no_final_save", dest="final_save", action="store_false", help="Do not save the final model.")
 
     # Training duration and checkpointing
     group.add_argument("--epochs", type=int, default=100, help="Number of epochs to train.")
-    group.add_argument("--max-training-steps", type=int, default=10_000_000, help="Maximum number of training steps.")
-    group.add_argument("--ckpt-every", type=int, default=5000, help="Save checkpoint every N steps.")
+    group.add_argument("--max_training_steps", type=int, default=10_000_000, help="Maximum number of training steps.")
+    group.add_argument("--ckpt_every", type=int, default=5000, help="Save checkpoint every N steps.")
 
     # RoPE (Rotary Position Embedding) configuration
-    group.add_argument("--rope-theta-rescale-factor", type=float, default=1.0, nargs="+", help="Rope interpolation factor.")
-    group.add_argument("--rope-interpolation-factor", type=float, default=1.0, nargs="+", help="Rope interpolation factor.")
+    group.add_argument("--rope_theta_rescale_factor", type=float, default=1.0, nargs="+", help="Rope interpolation factor.")
+    group.add_argument("--rope_interpolation_factor", type=float, default=1.0, nargs="+", help="Rope interpolation factor.")
 
     # Logging and monitoring
-    group.add_argument("--log-every", type=int, default=10, help="Log every N update steps.")
+    group.add_argument("--log_every", type=int, default=10, help="Log every N update steps.")
     group.add_argument("--tensorboard", action="store_true", help="Enable TensorBoard logging.")
     group.add_argument("--profile", action="store_true", help="Enable PyTorch profiler.")
     return parser
@@ -163,14 +163,14 @@ def add_optimizer_args(parser: argparse.ArgumentParser):
 
     # Learning rate configuration
     group.add_argument("--lr", type=float, default=1e-4, help="Basic learning rate, varies depending on learning rate schedule and warmup.")
-    group.add_argument("--warmup-min-lr", type=float, default=1e-6, help="Minimum learning rate for warmup.")
-    group.add_argument("--warmup-num-steps", type=int, default=0, help="Number of warmup steps for learning rate.")
+    group.add_argument("--warmup_min_lr", type=float, default=1e-6, help="Minimum learning rate for warmup.")
+    group.add_argument("--warmup_num_steps", type=int, default=0, help="Number of warmup steps for learning rate.")
 
     # AdamW optimizer parameters
-    group.add_argument("--adam-beta1", type=float, default=0.9, help="[AdamW] First coefficient for computing running averages of gradient.")
-    group.add_argument("--adam-beta2", type=float, default=0.999, help="[AdamW] Second coefficient for computing running averages of gradient square.")
-    group.add_argument("--adam-eps", type=float, default=1e-8, help="[AdamW] Term added to the denominator to improve numerical stability.")
-    group.add_argument("--weight-decay", type=float, default=0, help="Weight decay coefficient for L2 regularization.")
+    group.add_argument("--adam_beta1", type=float, default=0.9, help="[AdamW] First coefficient for computing running averages of gradient.")
+    group.add_argument("--adam_beta2", type=float, default=0.999, help="[AdamW] Second coefficient for computing running averages of gradient square.")
+    group.add_argument("--adam_eps", type=float, default=1e-8, help="[AdamW] Term added to the denominator to improve numerical stability.")
+    group.add_argument("--weight_decay", type=float, default=0, help="Weight decay coefficient for L2 regularization.")
     return parser
 
 
@@ -200,7 +200,7 @@ def add_network_args(parser: argparse.ArgumentParser):
         default="HYVideo-T/2",
     )
     group.add_argument(
-        "--latent-channels",
+        "--latent_channels",
         type=str,
         default=16,
         help="Number of latent channels of DiT. If None, it will be determined by `vae`. If provided, "
@@ -215,13 +215,13 @@ def add_network_args(parser: argparse.ArgumentParser):
     )
 
     # RoPE (Rotary Position Embedding) configuration
-    group.add_argument("--rope-theta", type=int, default=256, help="Theta used in RoPE.")
+    group.add_argument("--rope_theta", type=int, default=256, help="Theta used in RoPE.")
 
     # Memory optimization settings
-    group.add_argument("--gradient-checkpoint", action="store_true", help="Enable gradient checkpointing to reduce memory usage.")
+    group.add_argument("--gradient_checkpoint", action="store_true", help="Enable gradient checkpointing to reduce memory usage.")
 
     group.add_argument(
-        "--gradient-checkpoint-layers", type=int, default=-1, help="Number of layers to checkpoint. -1 for all layers. `n` for the first n layers."
+        "--gradient_checkpoint_layers", type=int, default=-1, help="Number of layers to checkpoint. -1 for all layers. `n` for the first n layers."
     )
 
     return parser
@@ -244,14 +244,14 @@ def add_extra_models_args(parser: argparse.ArgumentParser):
         help="Name of the VAE model.",
     )
     group.add_argument(
-        "--vae-precision",
+        "--vae_precision",
         type=str,
         default="fp16",
         choices=PRECISIONS,
         help="Precision mode for the VAE model.",
     )
     group.add_argument(
-        "--vae-tiling",
+        "--vae_tiling",
         action="store_true",
         help="Enable tiling for the VAE model to save GPU memory.",
     )
@@ -259,26 +259,26 @@ def add_extra_models_args(parser: argparse.ArgumentParser):
 
     # Primary text encoder (LLM-based)
     group.add_argument(
-        "--text-encoder",
+        "--text_encoder",
         type=str,
         default="llm-i2v",
         choices=list(TEXT_ENCODER_PATH),
         help="Name of the text encoder model.",
     )
     group.add_argument(
-        "--text-encoder-precision",
+        "--text_encoder_precision",
         type=str,
         default="fp16",
         choices=PRECISIONS,
         help="Precision mode for the text encoder model.",
     )
     group.add_argument(
-        "--text-states-dim",
+        "--text_states_dim",
         type=int,
         default=4096,
         help="Dimension of the text encoder hidden states.",
     )
-    group.add_argument("--text-len", type=int, default=256, help="Maximum length of the text input.")
+    group.add_argument("--text_len", type=int, default=256, help="Maximum length of the text input.")
     group.add_argument(
         "--tokenizer",
         type=str,
@@ -287,61 +287,61 @@ def add_extra_models_args(parser: argparse.ArgumentParser):
         help="Name of the tokenizer model.",
     )
     group.add_argument(
-        "--prompt-template",
+        "--prompt_template",
         type=str,
         default="dit-llm-encode-i2v",
         choices=PROMPT_TEMPLATE,
         help="Image prompt template for the decoder-only text encoder model.",
     )
     group.add_argument(
-        "--prompt-template-video",
+        "--prompt_template_video",
         type=str,
         default="dit-llm-encode-video-i2v",
         choices=PROMPT_TEMPLATE,
         help="Video prompt template for the decoder-only text encoder model.",
     )
     group.add_argument(
-        "--hidden-state-skip-layer",
+        "--hidden_state_skip_layer",
         type=int,
         default=2,
         help="Skip layer for hidden states.",
     )
     group.add_argument(
-        "--apply-final-norm",
+        "--apply_final_norm",
         action="store_true",
         help="Apply final normalization to the used text encoder hidden states.",
     )
 
     # Secondary text encoder (CLIP-based)
     group.add_argument(
-        "--text-encoder-2",
+        "--text_encoder_2",
         type=str,
         default="clipL",
         choices=list(TEXT_ENCODER_PATH),
         help="Name of the second text encoder model.",
     )
     group.add_argument(
-        "--text-encoder-precision-2",
+        "--text_encoder_precision_2",
         type=str,
         default="fp16",
         choices=PRECISIONS,
         help="Precision mode for the second text encoder model.",
     )
     group.add_argument(
-        "--text-states-dim-2",
+        "--text_states_dim_2",
         type=int,
         default=768,
         help="Dimension of the second text encoder hidden states.",
     )
     group.add_argument(
-        "--tokenizer-2",
+        "--tokenizer_2",
         type=str,
         default="clipL",
         choices=list(TOKENIZER_PATH),
         help="Name of the second tokenizer model.",
     )
     group.add_argument(
-        "--text-len-2",
+        "--text_len_2",
         type=int,
         default=77,
         help="Maximum length of the second text input.",
@@ -359,7 +359,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     group = parser.add_argument_group(title="Denoise schedule args")
 
     group.add_argument(
-        "--denoise-type",
+        "--denoise_type",
         type=str,
         default="flow",
         help="Denoise type for noised inputs.",
@@ -369,7 +369,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     # Flow matching is a technique for training continuous normalizing flows
     # that can generate high-quality samples through iterative denoising
     group.add_argument(
-        "--flow-shift",
+        "--flow_shift",
         type=float,
         default=17.0,
         help="Shift factor for flow matching schedulers.",
@@ -379,7 +379,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     # When enabled, the model learns/samples in reverse direction (t=1 -> t=0)
     # This can affect the quality and characteristics of generated samples
     group.add_argument(
-        "--flow-reverse",
+        "--flow_reverse",
         action="store_true",
         help="If reverse, learning/sampling from t=1 -> t=0.",
     )
@@ -388,7 +388,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     # Different solvers offer different trade-offs between accuracy and speed
     # Euler solver is fast but less accurate, while RK4 is more accurate but slower
     group.add_argument(
-        "--flow-solver",
+        "--flow_solver",
         type=str,
         default="euler",
         help="Solver for flow matching.",
@@ -398,7 +398,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     # This schedule provides a specific noise level progression during denoising
     # Based on research from MovieGen for improved video generation quality
     group.add_argument(
-        "--use-linear-quadratic-schedule",
+        "--use_linear_quadratic_schedule",
         action="store_true",
         help="Use linear quadratic schedule for flow matching." "Following MovieGen (https://ai.meta.com/static-resource/movie-gen-research-paper)",
     )
@@ -407,7 +407,7 @@ def add_denoise_schedule_args(parser: argparse.ArgumentParser):
     # Controls when the linear-quadratic schedule transitions to pure linear
     # This affects the noise reduction pattern during the denoising process
     group.add_argument(
-        "--linear-schedule-end",
+        "--linear_schedule_end",
         type=int,
         default=25,
         help="End step for linear quadratic schedule for flow matching.",
@@ -426,18 +426,18 @@ def add_inference_args(parser: argparse.ArgumentParser):
 
     # ======================== Model loading configuration ========================
     group.add_argument(
-        "--input-path",
+        "--input_path",
         type=str,
         help="Path to the input conditions.",
     )
     group.add_argument(
-        "--model-base",
+        "--model_base",
         type=str,
         default="/data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/ckpts",
         help="Root path of all the models, including t2v models and extra models.",
     )
     group.add_argument(
-        "--i2v-dit-weight",
+        "--i2v_dit_weight",
         type=str,
         default=DIT_WEIGHT_PATH["voyager"],
         help="Path to the HunyuanVideo model. If None, search the model in the args.model_root."
@@ -447,20 +447,20 @@ def add_inference_args(parser: argparse.ArgumentParser):
         "2) named `*_model_states.pt`, where * can be `mp_rank_00`.",
     )
     group.add_argument(
-        "--model-resolution",
+        "--model_resolution",
         type=str,
         default="540p",
         choices=["540p", "720p"],
         help="Root path of all the models, including t2v models and extra models.",
     )
     group.add_argument(
-        "--load-key",
+        "--load_key",
         type=str,
         default="module",
         help="Key to load the model states. 'module' for the main model, 'ema' for the EMA model.",
     )
     group.add_argument(
-        "--use-cpu-offload",
+        "--use_cpu_offload",
         action="store_true",
         help="Use CPU offload for the model load.",
     )
@@ -473,36 +473,36 @@ def add_inference_args(parser: argparse.ArgumentParser):
         help="Batch size for inference and evaluation.",
     )
     group.add_argument(
-        "--infer-steps",
+        "--infer_steps",
         type=int,
         default=50,
         help="Number of denoising steps for inference.",
     )
     group.add_argument(
-        "--disable-autocast",
+        "--disable_autocast",
         action="store_true",
         help="Disable autocast for denoising loop and vae decoding in pipeline sampling.",
     )
     group.add_argument(
-        "--save-path",
+        "--save_path",
         type=str,
         default="./results",
         help="Path to save the generated samples.",
     )
     group.add_argument(
-        "--save-path-suffix",
+        "--save_path_suffix",
         type=str,
         default="",
         help="Suffix for the directory of saved samples.",
     )
     group.add_argument(
-        "--name-suffix",
+        "--name_suffix",
         type=str,
         default="",
         help="Suffix for the names of saved samples.",
     )
     group.add_argument(
-        "--num-videos",
+        "--num_videos",
         type=int,
         default=1,
         help="Number of videos to generate for each prompt.",
@@ -510,7 +510,7 @@ def add_inference_args(parser: argparse.ArgumentParser):
 
     # Video size and length configuration
     group.add_argument(
-        "--video-size",
+        "--video_size",
         type=int,
         nargs="+",
         default=(512, 768),
@@ -519,7 +519,7 @@ def add_inference_args(parser: argparse.ArgumentParser):
         "respectively.",
     )
     group.add_argument(
-        "--video-length",
+        "--video_length",
         type=int,
         default=49,
         help="How many frames to sample from a video. if using 3d vae, the number should be 4n+1",
@@ -533,7 +533,7 @@ def add_inference_args(parser: argparse.ArgumentParser):
         help="Prompt for sampling during evaluation.",
     )
     group.add_argument(
-        "--seed-type",
+        "--seed_type",
         type=str,
         default="auto",
         choices=["file", "random", "fixed", "auto"],
@@ -545,23 +545,23 @@ def add_inference_args(parser: argparse.ArgumentParser):
     group.add_argument("--seed", type=int, default=None, help="Seed for evaluation.")
 
     # Classifier-Free Guidance configuration
-    group.add_argument("--neg-prompt", type=str, default=None, help="Negative prompt for sampling.")
+    group.add_argument("--neg_prompt", type=str, default=None, help="Negative prompt for sampling.")
     group.add_argument(
         # "--cfg-scale", type=float, default=1.0, help="Classifier free guidance scale."
-        "--cfg-scale",
+        "--cfg_scale",
         type=float,
         default=6.0,
         help="Classifier free guidance scale.",
     )
     group.add_argument(
-        "--embedded-cfg-scale",
+        "--embedded_cfg_scale",
         type=float,
         default=None,
         help="Embeded classifier free guidance scale.",
     )
 
     # Performance optimization
-    group.add_argument("--use-fp8", action="store_true", help="Enable use fp8 for inference acceleration.")
+    group.add_argument("--use_fp8", action="store_true", help="Enable use fp8 for inference acceleration.")
 
     group.add_argument(
         "--reproduce",
@@ -582,14 +582,14 @@ def add_i2v_args(parser: argparse.ArgumentParser):
     # This groups related arguments together in the help output for better organization
     group = parser.add_argument_group(title="I2V args")
 
-    group.add_argument("--i2v-mode", default=True, help="Whether to open i2v mode.")
+    group.add_argument("--i2v_mode", default=True, help="Whether to open i2v mode.")
 
-    group.add_argument("--i2v-resolution", type=str, default="720p", choices=["720p", "540p", "360p"], help="Resolution for i2v inference.")
+    group.add_argument("--i2v_resolution", type=str, default="720p", choices=["720p", "540p", "360p"], help="Resolution for i2v inference.")
 
-    group.add_argument("--i2v-image-path", type=str, default="./assets/demo/i2v/imgs/0.png", help="Image path for i2v inference.")
+    group.add_argument("--i2v_image_path", type=str, default="./assets/demo/i2v/imgs/0.png", help="Image path for i2v inference.")
 
     group.add_argument(
-        "--i2v-condition-type",
+        "--i2v_condition_type",
         type=str,
         # default="token_replace",
         default="latent_concat",
@@ -597,9 +597,9 @@ def add_i2v_args(parser: argparse.ArgumentParser):
         help="Condition type for i2v model.",
     )
 
-    group.add_argument("--i2v-stability", action="store_true", help="Whether to use i2v stability mode.")
+    group.add_argument("--i2v_stability", action="store_true", help="Whether to use i2v stability mode.")
 
-    group.add_argument("--use-context-block", action="store_true", help="Whether to use context block.")
+    group.add_argument("--use_context_block", action="store_true", help="Whether to use context block.")
 
     return parser
 
@@ -614,13 +614,13 @@ def add_lora_args(parser: argparse.ArgumentParser):
     # This groups related arguments together in the help output
     group = parser.add_argument_group(title="lora args")
 
-    group.add_argument("--use-lora", action="store_true", help="Whether to open lora mode.")
+    group.add_argument("--use_lora", action="store_true", help="Whether to open lora mode.")
 
-    group.add_argument("--lora-path", type=str, default="", help="Weight path for lora model.")
+    group.add_argument("--lora_path", type=str, default="", help="Weight path for lora model.")
 
-    group.add_argument("--lora-scale", type=float, default=1.0, help="Fusion scale for lora model.")
+    group.add_argument("--lora_scale", type=float, default=1.0, help="Fusion scale for lora model.")
 
-    group.add_argument("--lora-rank", type=int, default=64, help="Rank for lora model.")
+    group.add_argument("--lora_rank", type=int, default=64, help="Rank for lora model.")
 
     return parser
 
@@ -637,7 +637,7 @@ def add_parallel_args(parser: argparse.ArgumentParser):
     # Ulysses degree controls the degree of model parallelism in the Ulysses framework
     # Higher values enable more aggressive model sharding across devices
     group.add_argument(
-        "--ulysses-degree",
+        "--ulysses_degree",
         type=int,
         default=1,
         help="Ulysses degree for xdit parallel args.",
@@ -646,7 +646,7 @@ def add_parallel_args(parser: argparse.ArgumentParser):
     # Ring degree controls the degree of ring-based parallelism for efficient communication
     # Ring parallelism enables efficient all-reduce operations across multiple devices
     group.add_argument(
-        "--ring-degree",
+        "--ring_degree",
         type=int,
         default=1,
         help="Ring degree for xdit parallel args.",

@@ -854,6 +854,7 @@ class HunyuanVideoSampler(Inference):
         # Normalize from [-1, 1] range to [0, 255] range and save as PNG
         ref_images = [Image.fromarray(((torch.clamp(ref_images_pixel_values[0, :, 0].permute(
             1, 2, 0), min=-1, max=1).cpu().numpy() + 1) * 0.5 * 255).astype(np.uint8))]
+        print(f"ref_images images shape: {len(ref_images)} x {ref_images[0].size}")
 
         # Load partial condition images (frames that will guide the video generation)
         # These images provide temporal guidance for the video sequence
@@ -861,14 +862,14 @@ class HunyuanVideoSampler(Inference):
             image_path, image_size=closest_size) for image_path in partial_cond]
         partial_cond = torch.stack(
             partial_cond, dim=1).unsqueeze(0).to(self.device)
-        
+        print(f"partial_cond image shape: {partial_cond.shape}")
         # Load partial mask images (indicate which regions should be preserved/modified)
         # Masks control which parts of the video should be generated vs. kept from conditions
         partial_mask = [self.load_image(
             image_path, image_size=closest_size) for image_path in partial_mask]
         partial_mask = torch.stack(
             partial_mask, dim=1).unsqueeze(0).to(self.device)
-
+        print(f"partial_mask image shape: {partial_mask.shape}")
         # Use automatic mixed precision for memory efficiency during encoding
         with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
             # Enable VAE tiling for processing large images/videos efficiently
@@ -876,16 +877,14 @@ class HunyuanVideoSampler(Inference):
 
             # Encode reference images to latent space representation
             # This creates a compressed representation that guides the video generation
-            ref_latents = self.pipeline.vae.encode(
-                ref_images_pixel_values).latent_dist.sample()  # B, C, F, H, W
+            ref_latents = self.pipeline.vae.encode(ref_images_pixel_values).latent_dist.sample()  # B, C, F, H, W
             ref_latents.mul_(self.pipeline.vae.config.scaling_factor)
-
+            print(f"ref_latents shape: {ref_latents.shape}")
             # Encode partial condition images to latent space
             # These latents provide temporal guidance for the video sequence
-            partial_cond = self.pipeline.vae.encode(
-                partial_cond).latent_dist.sample()
+            partial_cond = self.pipeline.vae.encode(partial_cond).latent_dist.sample()
             partial_cond.mul_(self.pipeline.vae.config.scaling_factor)
-
+            print(f"partial_cond latents shape: {partial_cond.shape}")
             # Process mask frames for controlling video generation
             # Invert the mask so that 1 indicates regions to be generated
             mask_frames = 1 - partial_mask
@@ -907,6 +906,7 @@ class HunyuanVideoSampler(Inference):
             # Invert the mask again so that 1 indicates regions to preserve
             mask_frames = 1 - mask_frames
             partial_mask = mask_frames[:, 0:1]
+            print(f"partial_mask shape after pooling: {partial_mask.shape}")
 
             # # Load camera parameters (Plücker coordinates) for 3D scene understanding
             # # These parameters define the camera poses for each frame
@@ -936,16 +936,12 @@ class HunyuanVideoSampler(Inference):
 
         # Generate rotary position embeddings for the target video dimensions
         # These embeddings provide positional information to the transformer model
-        freqs_cos, freqs_sin = self.get_rotary_pos_embed(
-            target_video_length, target_height, target_width
-        )
-        
+        freqs_cos, freqs_sin = self.get_rotary_pos_embed(target_video_length, target_height, target_width)
+        print(f"freqs_cos shape: {freqs_cos.shape}, freqs_sin shape: {freqs_sin.shape}")
         # Generate rotary position embeddings for conditional frames
         # Adjusted dimensions account for the conditional frame structure
-        freqs_cos_cond, freqs_sin_cond = self.get_rotary_pos_embed(
-            target_video_length, (target_height - 16) // 2, target_width
-        )
-        
+        freqs_cos_cond, freqs_sin_cond = self.get_rotary_pos_embed(target_video_length, (target_height - 16) // 2, target_width)
+        print(f"freqs_cos_cond shape: {freqs_cos_cond.shape}, freqs_sin_cond shape: {freqs_sin_cond.shape}")
         # Calculate the total number of tokens for the transformer model
         # This determines the sequence length for attention mechanisms
         n_tokens = freqs_cos.shape[0]
@@ -968,7 +964,7 @@ class HunyuanVideoSampler(Inference):
             debug_str += f"""
                 ulysses_degree: {ulysses_degree}
                    ring_degree: {ring_degree}"""
-        logger.debug(debug_str)
+        logger.info(debug_str)
 
         start_time = time.time()
         samples = self.pipeline(

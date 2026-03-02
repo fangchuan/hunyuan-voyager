@@ -273,19 +273,42 @@ You can also modify the camera path in the `create_input.py` file.
 
 ```bash
 cd HunyuanWorld-Voyager
+pip install diffusers==0.31.0
+pip install tensorboard==2.19.0
+pip install transformers==4.39.3
+pip install deepspeed==0.15.1
+pip install peft==0.13.2
+pip install pyexr==0.5.0
+pip install decord
 
 python sample_image2video.py \
     --model HYVideo-T/2 \
-    --input-path "examples/case3" \
+    --input_path "examples/case2" \
     --prompt "In the Mountainous Vista scene, the rolling hills and expansive forest create a serene and majestic landscape under a vast, cloudy sky." \
-    --i2v-stability \
-    --infer-steps 50 \
-    --flow-reverse \
-    --flow-shift 7.0 \
+    --i2v_stability \
+    --infer_steps 50 \
+    --flow_reverse \
+    --flow_shift 7.0 \
     --seed 0 \
-    --embedded-cfg-scale 6.0 \
-    --use-cpu-offload \
-    --save-path ./results
+    --embedded_cfg_scale 6.0 \
+    --use_cpu_offload \
+    --use_context_block \
+    --save_path ./results
+
+python sample_image2video.py \
+    --model HYVideo-T/2   \
+    --input_path "examples/scene_001013_00_0"  \
+    --prompt "The modern living space integrates functionality and style, featuring a neutral color palette with bold decorative accents. A bright, open-plan design showcases sleek furniture, a modern kitchen, and a welcoming atmosphere. This contemporary home blends comfort and aesthetics, with a cohesive layout and thoughtful decor choices."    \
+    --i2v_stability   \
+    --i2v_resolution 720p   \
+    --infer_steps 50    \
+    --flow_reverse    \
+    --flow_shift 7.0  \
+    --seed 0    \
+    --embedded_cfg_scale 6.0   \
+    --use_cpu_offload   \
+    --use_context_block \
+    --save_path ./results
 ```
 You can add "--use-context-block" to add the context block in the inference.
 

@@ -1,20 +1,20 @@
-import random
-import torchvision.transforms as transforms
-
-import numpy as np
-import torch
-
-import imageio
 import os
-import PIL.Image
+import random
+from pathlib import Path
 from typing import Union, Optional, List
+
+import torch
+import numpy as np
+import PIL.Image
+from PIL import Image
+from einops import rearrange
+import torchvision.transforms as transforms
+from peft import get_peft_model_state_dict
 
 from voyager.modules.posemb_layers import get_nd_rotary_pos_embed
 from voyager.vae import AutoencoderKLCausal3D
 
-from pathlib import Path
-from einops import rearrange
-from PIL import Image
+
 
 from voyager.constants import PRECISION_TO_TYPE
 from safetensors.torch import load_file
@@ -229,7 +229,7 @@ def prepare_model_inputs(
     rope_theta_rescale_factor: Union[float, List[float]] = 1.0,
     rope_interpolation_factor: Union[float, List[float]] = 1.0,
 ):
-    media, latents, *batch_args = batch
+    media, gt_latents, partial_cond_latents, *batch_args = batch
     if len(batch_args) == 3:
         text_ids, text_mask, kwargs = batch_args
         text_ids_2, text_mask_2 = None, None
@@ -241,14 +241,15 @@ def prepare_model_inputs(
 
     # Move batch to device
     media = media.to(device)
-    latents = latents.to(device)
+    gt_latents = gt_latents.to(device)
+    partial_cond_latents = partial_cond_latents.to(device)
     text_ids = text_ids.to(device)
     text_mask = text_mask.to(device)
-
+    print(f"media shape: {media.shape}, gt_latents shape: {gt_latents.shape}, partial_cond_latents shape: {partial_cond_latents.shape}")
     # ======================================== Encode media ======================================
     # Used for 3D VAE with 2D inputs(image).
     # Prepare media shape for 2D/3D VAE
-    if len(latents.shape) == 1:
+    if len(gt_latents.shape) == 1:
         if len(media.shape) == 4:
             # media is a batch of image with shape [b, c, h, w]
             if isinstance(vae, AutoencoderKLCausal3D):
@@ -266,29 +267,29 @@ def prepare_model_inputs(
         with torch.autocast(
             device_type="cuda", dtype=vae_dtype, enabled=vae_dtype != torch.float32
         ):
-            latents = vae.encode(media).latent_dist.sample()
+            gt_latents = vae.encode(media).latent_dist.sample()
             if hasattr(vae.config, "shift_factor") and vae.config.shift_factor:
-                latents.sub_(vae.config.shift_factor).mul_(
+                gt_latents.sub_(vae.config.shift_factor).mul_(
                     vae.config.scaling_factor)
             else:
-                latents.mul_(vae.config.scaling_factor)
-    elif len(latents.shape) == 5 or len(latents.shape) == 4:  # Using video/image cache
-        latents = (
-            latents * vae.config.scaling_factor
+                gt_latents.mul_(vae.config.scaling_factor)
+    elif len(gt_latents.shape) == 5 or len(gt_latents.shape) == 4:  # Using video/image cache
+        gt_latents = (
+            gt_latents * vae.config.scaling_factor
         )  # vae cache is not multiplied by scaling_factor
     else:
         raise ValueError(
             f"Only support media/latent with shape (b, c, h, w) or (b, c, f, h, w), \
-                but got {media.shape} {latents.shape}."
+                but got {media.shape} {gt_latents.shape}."
         )
 
-    cond_latents = get_cond_latents(args, latents, vae)
+    first_cond_latents = get_cond_latents(args, gt_latents, vae)
     is_uncond = (
         torch.tensor(1).to(torch.int64)
         if random.random() < args.sematic_cond_drop_p
         else torch.tensor(0).to(torch.int64)
     )
-    semantic_images = get_cond_images(args, latents, vae, is_uncond=is_uncond)
+    semantic_images = get_cond_images(args, gt_latents, vae, is_uncond=is_uncond)
 
     # ======================================== Encode text ======================================
     # Autocast is handled by text_encoder itself.
@@ -311,8 +312,8 @@ def prepare_model_inputs(
 
     # ======================================== Build RoPE ======================================
     target_ndim = 3  # n-d RoPE
-    ndim = len(latents.shape) - 2
-    latents_size = list(latents.shape[-ndim:])
+    ndim = len(gt_latents.shape) - 2
+    latents_size = list(gt_latents.shape[-ndim:])
     freqs_cos, freqs_sin = get_rope_freq_from_size(
         args,
         model,
@@ -333,7 +334,7 @@ def prepare_model_inputs(
         return_dict=True,
     )
 
-    return latents, model_kwargs, freqs_cos.shape[0], cond_latents
+    return gt_latents, model_kwargs, freqs_cos.shape[0], first_cond_latents, partial_cond_latents
 
 
 def format_params(params):
@@ -377,7 +378,7 @@ def get_rope_freq_from_size(
         )
         rope_sizes = [s // model.patch_size[idx]
                       for idx, s in enumerate(latents_size)]
-
+        
     if len(rope_sizes) != target_ndim:
         rope_sizes = [1] * (target_ndim - len(rope_sizes)
                             ) + rope_sizes  # time axis
@@ -398,6 +399,27 @@ def get_rope_freq_from_size(
         theta_rescale_factor=rope_theta_rescale_factor,
         interpolation_factor=rope_interpolation_factor,
     )
-
     return freqs_cos, freqs_sin
 
+
+# copy from https://github.com/huggingface/diffusers/blob/ec9bfa9e148b7764137dd92247ce859d915abcb0/examples/consistency_distillation/train_lcm_distill_lora_sd_wds.py#L258
+# get kohya lora state dict
+def get_module_kohya_state_dict(module, prefix, dtype, adapter_name="default"):
+    kohya_ss_state_dict = {}
+    for peft_key, weight in get_peft_model_state_dict(
+        module, adapter_name=adapter_name
+    ).items():
+        kohya_key = peft_key.replace("base_model.model", prefix)
+        kohya_key = kohya_key.replace("lora_A", "lora_down")
+        kohya_key = kohya_key.replace("lora_B", "lora_up")
+        kohya_key = kohya_key.replace(".", "_", kohya_key.count(".") - 2)
+        kohya_ss_state_dict[kohya_key] = weight.to(dtype)
+
+        # Set alpha parameter
+        if "lora_down" in kohya_key:
+            alpha_key = f'{kohya_key.split(".")[0]}.alpha'
+            kohya_ss_state_dict[alpha_key] = torch.tensor(
+                module.peft_config[adapter_name].lora_alpha
+            ).to(dtype)
+
+    return kohya_ss_state_dict

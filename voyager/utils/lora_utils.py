@@ -31,7 +31,7 @@ def load_lora_for_pipeline(
         if ".alpha" in key or key in visited:
             continue
 
-        if "text" in key:
+        if "_text_" in key:
             layer_infos = (
                 key.split(".")[0].split(
                     LORA_PREFIX_TEXT_ENCODER + "_")[-1].split("_")

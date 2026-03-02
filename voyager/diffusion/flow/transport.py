@@ -1,9 +1,12 @@
 import enum
 import math
-from typing import Callable
+from typing import Callable, Union, Optional
 import copy
+
+import torch
 import numpy as np
 import torch as th
+from loguru import logger
 
 from . import path
 from .integrators import ode, sde
@@ -166,7 +169,7 @@ class Transport:
             return t * self.training_timesteps
 
     def training_losses(self, model, x1, model_kwargs=None, timestep=None, n_tokens=None,
-                        i2v_mode=False, cond_latents=None, args=None):
+                        i2v_mode=False, cond_latents=None, args=None, partial_cond_latents=None):
 
         self.shift = self.video_shift
         if model_kwargs == None:
@@ -185,12 +188,18 @@ class Transport:
             else:
                 x1_concat = x1.cpu().clone().to(device=x1.device)
                 x1_concat[:, :, 1:, :, :] = 0.0
-
+            # mask for the first frame
             mask_concat = th.ones(
                 x1.shape[0], 1, x1.shape[2], x1.shape[3], x1.shape[4]).to(device=x1.device)
             mask_concat[:, :, 1:, ...] = 0.0
-
-            xt = th.concat([xt, x1_concat, mask_concat], dim=1)
+            
+            assert partial_cond_latents is not None, "partial_cond_latents must be provided for latent_concat i2v mode"
+            # mask for other frames, 1 indicates regions to preserve
+            partial_cond_mask_frames = th.ones(
+                x1.shape[0], 1, x1.shape[2], x1.shape[3], x1.shape[4]).to(device=x1.device)
+            partial_cond_masks = partial_cond_mask_frames[:, 0:1]
+            print(f"partial_cond_latents shape: {partial_cond_latents.shape}, partial_cond_masks shape: {partial_cond_masks.shape}")
+            xt = th.concat([xt, x1_concat, mask_concat, partial_cond_latents, partial_cond_masks], dim=1)
         elif i2v_mode and args.i2v_condition_type == "token_replace":
             xt = th.concat([cond_latents, xt[:, :, 1:, :, :]], dim=2)
 
@@ -205,9 +214,26 @@ class Transport:
             else None
         )
         model_kwargs["guidance"] = guidance_expand
-
+        
+        target_video_length = (x1.shape[2] - 1) * 4 + 1  # original video length
+        target_height = x1.shape[3] * 8
+        target_width = x1.shape[4] * 8
+        # freqs_cos, freqs_sin = self.get_rotary_pos_embed(target_video_length, target_height, target_width)
+        print(f"freqs_cos shape: {model_kwargs['freqs_cos'].shape}, freqs_sin shape: {model_kwargs['freqs_sin'].shape}")
+        freqs_cos_cond, freqs_sin_cond = model.module.get_rotary_pos_embed(target_video_length, (target_height - 16) // 2, target_width)
+        print(f"freqs_cos_cond shape: {freqs_cos_cond.shape}, freqs_sin_cond shape: {freqs_sin_cond.shape}")
+        model_kwargs['freqs_cos_cond'] = freqs_cos_cond
+        model_kwargs['freqs_sin_cond'] = freqs_sin_cond
         model_output = model(xt, input_t, **model_kwargs)['x']
-
+        # text_states=prompt_embeds,  # [2, 256, 4096]
+        # text_mask=prompt_mask,  # [2, 256]
+        # text_states_2=prompt_embeds_2,  # [2, 768]
+        # freqs_cos=freqs_cis[0],  # [seqlen, head_dim]
+        # freqs_sin=freqs_cis[1],  # [seqlen, head_dim]
+        # freqs_cos_cond=freqs_cis_cond[0],  # [seqlen, head_dim]
+        # freqs_sin_cond=freqs_cis_cond[1],  # [seqlen, head_dim]
+        # guidance=guidance_expand,
+                        
         if i2v_mode and args.i2v_condition_type == "token_replace":
             assert self.model_type == ModelType.VELOCITY, \
                 f"self.model_type: {self.model_type} must be ModelType.VELOCITY"

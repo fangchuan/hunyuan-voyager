@@ -15,7 +15,7 @@ def main():
     models_root_path = Path(args.model_base)
     if not models_root_path.exists():
         raise ValueError(f"`models_root` not exists: {models_root_path}")
-
+    logger.info(f"Models root path: {models_root_path}")
     # Create save folder to save the samples
     save_path = args.save_path if args.save_path_suffix == "" else f"{args.save_path}_{args.save_path_suffix}"
     if not os.path.exists(save_path):
@@ -52,11 +52,11 @@ def main():
         ref_images=[(os.path.join(args.input_path, "ref_image.png"), os.path.join(args.input_path, "ref_depth.exr"))],
         partial_cond=[
             (os.path.join(args.input_path, "video_input", f"render_{j:04d}.png"), os.path.join(args.input_path, "video_input", f"depth_{j:04d}.exr"))
-            for j in range(49)
+            for j in range(args.video_length)
         ],
         partial_mask=[
             (os.path.join(args.input_path, "video_input", f"mask_{j:04d}.png"), os.path.join(args.input_path, "video_input", f"mask_{j:04d}.png"))
-            for j in range(49)
+            for j in range(args.video_length)
         ],
     )
     samples = outputs["samples"]

@@ -468,8 +468,7 @@ class HunyuanVideoPipeline(DiffusionPipeline):
         )
 
     def decode_latents(self, latents, enable_tiling=True):
-        deprecation_message = "The decode_latents method is deprecated and will be removed in 1.0.0.\
-Please use VaeImageProcessor.postprocess(...) instead"
+        deprecation_message = "The decode_latents method is deprecated and will be removed in 1.0.0. Please use VaeImageProcessor.postprocess(...) instead"
         deprecate("decode_latents", "1.0.0",
                   deprecation_message, standard_warn=False)
 
@@ -971,6 +970,7 @@ Please use VaeImageProcessor.postprocess(...) instead"
             sigmas,
             **extra_set_timesteps_kwargs,
         )
+        print(f"Timesteps for inference: {timesteps}")
 
         if "884" in vae_ver:
             video_length = (video_length - 1) // 4 + 1
@@ -978,25 +978,25 @@ Please use VaeImageProcessor.postprocess(...) instead"
             video_length = (video_length - 1) // 8 + 1
         else:
             video_length = video_length
-
+        print(f"Adjusted video length for VAE {vae_ver}: {video_length}")
         # 5. Prepare latent variables
         num_channels_latents = self.transformer.config.in_channels
         latents = self.prepare_latents(
-            batch_size * num_videos_per_prompt,
-            num_channels_latents,
-            height,
-            width,
-            video_length,
-            prompt_embeds.dtype,
-            device,
-            generator,
-            latents,
+            batch_size=batch_size * num_videos_per_prompt,
+            num_channels_latents=num_channels_latents,
+            height=height,
+            width=width,
+            video_length=video_length,
+            dtype=prompt_embeds.dtype,
+            device=device,
+            generator=generator,
+            latents=latents,
             img_latents=img_latents,
             i2v_mode=i2v_mode,
             i2v_condition_type=i2v_condition_type,
             i2v_stability=i2v_stability
         )
-
+        print(f"Noisy Latents shape: {latents.shape}")
         if i2v_mode and i2v_condition_type == "latent_concat":
             if img_latents.shape[2] == 1:
                 img_latents_concat = img_latents.repeat(
@@ -1020,17 +1020,12 @@ Please use VaeImageProcessor.postprocess(...) instead"
         )
 
         target_dtype = PRECISION_TO_TYPE[self.args.precision]
-        autocast_enabled = (
-            target_dtype != torch.float32
-        ) and not self.args.disable_autocast
+        autocast_enabled = target_dtype != torch.float32 and not self.args.disable_autocast
         vae_dtype = PRECISION_TO_TYPE[self.args.vae_precision]
-        vae_autocast_enabled = (
-            vae_dtype != torch.float32
-        ) and not self.args.disable_autocast
+        vae_autocast_enabled = vae_dtype != torch.float32 and not self.args.disable_autocast
 
         # 7. Denoising loop
-        num_warmup_steps = len(timesteps) - \
-            num_inference_steps * self.scheduler.order
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
 
         # if is_progress_bar:
@@ -1045,8 +1040,8 @@ Please use VaeImageProcessor.postprocess(...) instead"
 
                 # expand the latents if we are doing classifier free guidance
                 if i2v_mode and i2v_condition_type == "latent_concat":
-                    latent_model_input = torch.concat(
-                        [latents, img_latents_concat, mask_concat, partial_cond, partial_mask], dim=1)
+                    latent_model_input = torch.concat([latents, img_latents_concat, mask_concat, partial_cond, partial_mask], dim=1)
+                    print(f"Latent model input shape (i2v latent_concat): {latent_model_input.shape}, img_latents_concat shape: {img_latents_concat.shape}, mask_concat shape: {mask_concat.shape}, partial_cond shape: {partial_cond.shape}, partial_mask shape: {partial_mask.shape}")
                 else:
                     latent_model_input = latents
 
@@ -1089,9 +1084,7 @@ Please use VaeImageProcessor.postprocess(...) instead"
                         freqs_sin_cond=freqs_cis_cond[1],  # [seqlen, head_dim]
                         guidance=guidance_expand,
                         return_dict=True,
-                    )[
-                        "x"
-                    ]
+                    )["x"]
 
                 # perform guidance
                 if self.do_classifier_free_guidance:

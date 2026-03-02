@@ -27,7 +27,7 @@ def main(image_dir, output_dir):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load model
-    model = MoGeModel.from_pretrained("Ruicheng/moge-vitl").to(device)  
+    model = MoGeModel.from_pretrained("/data-nas/models/MoGe").to(device)  
     model.eval()
 
     include_suffices = ['jpg', 'png', 'jpeg', 'JPG', 'PNG', 'JPEG']

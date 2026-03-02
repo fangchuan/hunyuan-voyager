@@ -112,7 +112,7 @@ def save_uploaded_image(image, save_dir="temp_images"):
 
 
 def create_video_demo():
-    moge_model = MoGeModel.from_pretrained("Ruicheng/moge-vitl").to("cuda:0")
+    moge_model = MoGeModel.from_pretrained("/data-nas/models/MoGe").to("cuda:0")
 
     def process_condition_generation(image, direction):
         temp_path = os.path.join("temp", uuid.uuid4().hex[:8])

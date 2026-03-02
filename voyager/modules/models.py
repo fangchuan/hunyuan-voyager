@@ -1,14 +1,15 @@
 from typing import Any, List, Tuple, Optional, Union, Dict
-from einops import rearrange
 
 import torch
+import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
-
-from diffusers.models import ModelMixin
-from diffusers.configuration_utils import ConfigMixin, register_to_config
 import torch.utils
 import torch.utils.checkpoint
+from loguru import logger
+from einops import rearrange
+from diffusers.models import ModelMixin
+from diffusers.configuration_utils import ConfigMixin, register_to_config
+
 
 from .activation_layers import get_activation_layer
 from .norm_layers import get_norm_layer
@@ -18,6 +19,7 @@ from .posemb_layers import apply_rotary_emb
 from .mlp_layers import MLP, MLPEmbedder, FinalLayer
 from .modulate_layers import ModulateDiT, modulate, apply_gate, ckpt_wrapper
 from .token_refiner import SingleTokenRefiner
+from voyager.modules.posemb_layers import get_nd_rotary_pos_embed
 
 
 class MMDoubleStreamBlock(nn.Module):
@@ -713,7 +715,172 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
             block.disable_deterministic()
         for block in self.single_blocks:
             block.disable_deterministic()
+            
+    ###############################################
+    # 20250308 pftq: Riflex workaround to fix 192-frame-limit bug, credit to Kijai for finding it in ComfyUI
+    # and thu-ml for making it
+    # https://github.com/thu-ml/RIFLEx/blob/main/riflex_utils.py
+    @staticmethod
+    def get_1d_rotary_pos_embed_riflex(
+        dim: int,
+        pos: Union[np.ndarray, int],
+        theta: float = 10000.0,
+        use_real=False,
+        k: Optional[int] = None,
+        L_test: Optional[int] = None,
+    ):
+        """
+        RIFLEx: Precompute the frequency tensor for complex exponentials (cis) with given dimensions.
 
+        This function calculates a frequency tensor with complex exponentials using the given dimension 'dim' and the end
+        index 'end'. The 'theta' parameter scales the frequencies. The returned tensor contains complex values in complex64
+        data type.
+
+        Args:
+            dim (`int`): Dimension of the frequency tensor.
+            pos (`np.ndarray` or `int`): Position indices for the frequency tensor. [S] or scalar
+            theta (`float`, *optional*, defaults to 10000.0):
+                Scaling factor for frequency computation. Defaults to 10000.0.
+            use_real (`bool`, *optional*):
+                If True, return real part and imaginary part separately. Otherwise, return complex numbers.
+            k (`int`, *optional*, defaults to None): the index for the intrinsic frequency in RoPE
+            L_test (`int`, *optional*, defaults to None): the number of frames for inference
+        Returns:
+            `torch.Tensor`: Precomputed frequency tensor with complex exponentials. [S, D/2]
+        """
+        assert dim % 2 == 0
+
+        if isinstance(pos, int):
+            pos = torch.arange(pos)
+        if isinstance(pos, np.ndarray):
+            pos = torch.from_numpy(pos)  # type: ignore  # [S]
+
+        freqs = 1.0 / (
+            theta ** (torch.arange(0, dim, 2, device=pos.device)
+                    [: (dim // 2)].float() / dim)
+        )  # [D/2]
+
+        # === Riflex modification start ===
+        # Reduce the intrinsic frequency to stay within a single period after extrapolation (see Eq. (8)).
+        # Empirical observations show that a few videos may exhibit repetition in the tail frames.
+        # To be conservative, we multiply by 0.9 to keep the extrapolated length below 90% of a single period.
+        if k is not None:
+            freqs[k-1] = 0.9 * 2 * torch.pi / L_test
+        # === Riflex modification end ===
+
+        freqs = torch.outer(pos, freqs)  # type: ignore   # [S, D/2]
+        if use_real:
+            freqs_cos = freqs.cos().repeat_interleave(2, dim=1).float()  # [S, D]
+            freqs_sin = freqs.sin().repeat_interleave(2, dim=1).float()  # [S, D]
+            return freqs_cos, freqs_sin
+        else:
+            # lumina
+            freqs_cis = torch.polar(torch.ones_like(
+                freqs), freqs)  # complex64     # [S, D/2]
+            return freqs_cis
+
+    def get_rotary_pos_embed(self, video_length, height, width):
+        target_ndim = 3
+        ndim = 5 - 2  # B, C, F, H, W -> F, H, W
+
+        VAE_VERSION = "884-16c-hy"  # Placeholder, should be set according to actual VAE used
+        # Compute latent sizes based on VAE type
+        if "884" in VAE_VERSION:
+            latents_size = [(video_length - 1) // 4 +
+                            1, height // 8, width // 8]
+        elif "888" in VAE_VERSION:
+            latents_size = [(video_length - 1) // 8 +
+                            1, height // 8, width // 8]
+        else:
+            latents_size = [video_length, height // 8, width // 8]
+
+        # Compute rope sizes
+        if isinstance(self.patch_size, int):
+            assert all(s % self.patch_size == 0 for s in latents_size), (
+                f"Latent size(last {ndim} dimensions) should be divisible by patch size({self.patch_size}), "
+                f"but got {latents_size}."
+            )
+            rope_sizes = [s // self.patch_size for s in latents_size]
+        elif isinstance(self.patch_size, list):
+            assert all(
+                s % self.patch_size[idx] == 0
+                for idx, s in enumerate(latents_size)
+            ), (
+                f"Latent size(last {ndim} dimensions) should be divisible by patch size({self.patch_size}), "
+                f"but got {latents_size}."
+            )
+            rope_sizes = [s // self.patch_size[idx]
+                          for idx, s in enumerate(latents_size)]
+
+        if len(rope_sizes) != target_ndim:
+            rope_sizes = [1] * (target_ndim - len(rope_sizes)
+                                ) + rope_sizes  # Pad time axis
+
+        # 20250316 pftq: Add RIFLEx logic for > 192 frames
+        L_test = rope_sizes[0]  # Latent frames
+        L_train = 25  # Training length from HunyuanVideo
+        actual_num_frames = video_length  # Use input video_length directly
+
+        head_dim = self.hidden_size // self.heads_num
+        rope_dim_list = self.rope_dim_list or [
+            head_dim // target_ndim for _ in range(target_ndim)]
+        assert sum(
+            rope_dim_list) == head_dim, "sum(rope_dim_list) must equal head_dim"
+
+        rope_theta = 256  # theta used for RoPE
+        if actual_num_frames > 192:
+            k = 2+((actual_num_frames + 3) // (4 * L_train))
+            k = max(4, min(8, k))
+            logger.debug(f"actual_num_frames = {actual_num_frames} > 192, RIFLEx applied with k = {k}")
+
+            # Compute positional grids for RIFLEx
+            axes_grids = [torch.arange(
+                size, device=self.device, dtype=torch.float32) for size in rope_sizes]
+            grid = torch.meshgrid(*axes_grids, indexing="ij")
+            grid = torch.stack(grid, dim=0)  # [3, t, h, w]
+            pos = grid.reshape(3, -1).t()  # [t * h * w, 3]
+
+            # Apply RIFLEx to temporal dimension
+            freqs = []
+            for i in range(3):
+                if i == 0:  # Temporal with RIFLEx
+                    freqs_cos, freqs_sin = self.get_1d_rotary_pos_embed_riflex(
+                        rope_dim_list[i],
+                        pos[:, i],
+                        theta=rope_theta,
+                        use_real=True,
+                        k=k,
+                        L_test=L_test
+                    )
+                else:  # Spatial with default RoPE
+                    freqs_cos, freqs_sin = self.get_1d_rotary_pos_embed_riflex(
+                        rope_dim_list[i],
+                        pos[:, i],
+                        theta=rope_theta,
+                        use_real=True,
+                        k=None,
+                        L_test=None
+                    )
+                freqs.append((freqs_cos, freqs_sin))
+                logger.debug(f"freq[{i}] shape: {freqs_cos.shape}, device: {freqs_cos.device}")
+
+            freqs_cos = torch.cat([f[0] for f in freqs], dim=1)
+            freqs_sin = torch.cat([f[1] for f in freqs], dim=1)
+            logger.debug(f"freqs_cos shape: {freqs_cos.shape}, device: {freqs_cos.device}")
+        else:
+            # 20250316 pftq: Original code for <= 192 frames
+            logger.debug(f"actual_num_frames = {actual_num_frames} <= 192, using original RoPE")
+            freqs_cos, freqs_sin = get_nd_rotary_pos_embed(
+                rope_dim_list,
+                rope_sizes,
+                theta=rope_theta,
+                use_real=True,
+                theta_rescale_factor=1,
+            )
+            logger.debug(f"freqs_cos shape: {freqs_cos.shape}, device: {freqs_cos.device}")
+
+        return freqs_cos, freqs_sin
+    
     def forward(
         self,
         x: torch.Tensor,
@@ -734,6 +901,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         img = x
         txt = text_states
         _, _, ot, oh, ow = x.shape
+        print(f"img shape: {x.shape}, t: {t.shape}, text_states: {text_states.shape if text_states is not None else None}, text_mask: {text_mask.shape if text_mask is not None else None}")
         tt, th, tw = (
             ot // self.patch_size[0],
             oh // self.patch_size[1],
@@ -742,6 +910,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
 
         # Prepare modulation vectors.
         vec = self.time_in(t)
+        print(f"time_in output shape: {vec.shape}")
 
         if self.i2v_condition_type == "token_replace":
             token_replace_t = torch.zeros_like(t)
@@ -753,6 +922,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
 
         # text modulation
         vec_2 = self.vector_in(text_states_2)
+        print(f"vector_in output shape: {vec_2.shape}")
         vec = vec + vec_2
         if self.i2v_condition_type == "token_replace":
             token_replace_vec = token_replace_vec + vec_2
@@ -772,9 +942,12 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
             condition = img.clone()
             height = (condition.shape[-2] - 2) // 2
             condition = condition[..., -height:, :]  # depth
+            print(f"only use the depth frame as condition, condition shape: {condition.shape}")
             condition = self.condition_in(condition)
+            print(f"condition_in output shape: {condition.shape}")
 
         img = self.img_in(img)
+        print(f"img_in shape: {img.shape}")
         if self.text_projection == "linear":
             txt = self.txt_in(txt)
         elif self.text_projection == "single_refiner":
@@ -793,7 +966,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         cu_seqlens_kv = cu_seqlens_q
         max_seqlen_q = img_seq_len + txt_seq_len
         max_seqlen_kv = max_seqlen_q
-
+        print(f"cu_seqlens_q: {cu_seqlens_q}, max_seqlen_q: {max_seqlen_q}")
         if self.use_context_block:
             cond_seq_len = condition.shape[1]
             cu_seqlens_q_cond = get_cu_seqlens(text_mask, cond_seq_len)
@@ -817,6 +990,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 frist_frame_token_num,
             ]
             condition1, txt1 = self.context_block1(*context_block_args)
+            print(f"context_block1 output shape: condition1: {condition1.shape}, txt1: {txt1.shape}")
 
             condition2 = torch.cat((condition1, txt1), 1)
             context_block_args = [
@@ -834,9 +1008,10 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 frist_frame_token_num,
             ]
             condition2 = self.context_block2(*context_block_args)
-
+            print(f"context_block2 output shape: condition2: {condition2.shape}")
             condition1 = self.zero_linear1(condition1)
             condition2 = self.zero_linear2(condition2)
+            print(f"after zero_linear, condition1 shape: {condition1.shape}, condition2 shape: {condition2.shape}")
 
             condition2 = torch.cat(
                 (torch.zeros_like(img)[:, :-condition1.shape[1]], condition2), dim=1)
@@ -862,7 +1037,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
 
             if self.training and self.gradient_checkpoint and \
                     (self.gradient_checkpoint_layers == -1 or layer_num < self.gradient_checkpoint_layers):
-                # print(f'gradient checkpointing...')
+                logger.info('gradient checkpointing in double blocks...')
                 img, txt = torch.utils.checkpoint.checkpoint(
                     ckpt_wrapper(block), *double_block_args, use_reentrant=False)
                 if self.use_context_block:
@@ -894,6 +1069,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 if self.training and self.gradient_checkpoint and \
                         (self.gradient_checkpoint_layers == -1 or \
                         layer_num + len(self.double_blocks) < self.gradient_checkpoint_layers):
+                    logger.info('gradient checkpointing in single blocks...')
                     x = torch.utils.checkpoint.checkpoint(ckpt_wrapper(
                         block), *single_block_args, use_reentrant=False)
                     if self.use_context_block:
@@ -908,8 +1084,10 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         # ---------------------------- Final layer ------------------------------
         # (N, T, patch_size ** 2 * out_channels)
         img = self.final_layer(img, vec)
+        print(f"after final_layer, img shape: {img.shape}")
 
         img = self.unpatchify(img, tt, th, tw)
+        print(f"after unpatchify, img shape: {img.shape}")
         if return_dict:
             out["x"] = img
             return out
