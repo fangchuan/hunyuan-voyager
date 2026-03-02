@@ -1,0 +1,12 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+# Ignore log files
+log_EXP/
+test_data/
+# Ignore results
+results/
+# Ignore data
+test_data/
+results_spatialvideo/
+examples/

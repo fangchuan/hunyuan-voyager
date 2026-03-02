@@ -1,0 +1,7 @@
+diffusers==0.31.0
+tensorboard==2.19.0
+transformers==4.39.3
+deepspeed==0.15.1
+peft==0.13.2
+pyexr==0.5.0
+decord
