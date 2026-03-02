@@ -45,8 +45,6 @@ if __name__ == "__main__":
     num_success = 0
     for _, row in test_scene_df.iterrows():
         scene = row["scene_id"]
-        if scene != "L4D5119S403B0ENDOR2YTSYUWKDOQLUFX6TNOAQ8":
-            continue
         
         scene_dir = os.path.join(test_data_dir, scene)
         prompt_filepath = os.path.join(scene_dir, "input_prompt.txt")
