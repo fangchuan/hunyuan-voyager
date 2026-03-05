@@ -33,7 +33,7 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
         f"--data-dir={cfg.env.data_high_dir}",
         f"--sync-source={cfg.env.sync_source}",
         f"--sync-branch={cfg.env.sync_branch}",
-        # f"--selector=kubernetes.io/hostname=cn-hangzhou.10.111.10.20",
+        # f"--selector=kubernetes.io/hostname=cn-hangzhou.10.111.21.23",
         # f"--selector={cfg.env.selector}",
         # f"--toleration mri-monopolize-node=zhenqing:NoSchedule,Equal",
         # f"-l quota.scheduling.koordinator.sh/name=training-zhenqing",
@@ -65,6 +65,8 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
         "env",
         "pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && pip install jaxtyping omegaconf typeguard shapely swanlab pyexr loguru pandas agentscope ",
         "pip install diffusers==0.31.0 tensorboard==2.19.0 transformers==4.39.3 deepspeed==0.15.1 peft==0.13.2 pyexr==0.5.0 decord",
+        # "cd /workspace/code/hunyuan_voyager",
+        "cd /data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager",
         exe_cmd_str + args,
     ]
     script_commands = '"' + " && ".join(script_commands) + '"'
@@ -74,7 +76,7 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
     # os.system(command)
 
 
-@hydra.main(version_base="1.2", config_path="./data_engine/configs", config_name="process_caption_video_dataset_h20.yaml")
+@hydra.main(version_base="1.2", config_path="./configs", config_name="inference_spatialvideo_dataset_h20.yaml")
 def main_dispatcher(cfg: DictConfig) -> None:
     dataset_processed_meta_filepath = "/data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/spatialvideo_test/test_scenes.csv"
     metadata = pd.read_csv(dataset_processed_meta_filepath)

@@ -22,8 +22,8 @@ env:
   data: "alluxio-alluxio-csi-fuse-pvc:/alluxio"
   data_dir: /data-nas:/data-nas
   data_high_dir: /data-high-nas:/data-high-nas
-  sync_source: https://gitlab.qunhequnhe.com/zhenqing/hunyuan-voyager.git
-  sync_branch: main
+  sync_source: https://gitlab.qunhequnhe.com/zhenqing/Spatial3DV.git
+  sync_branch: develop
   gpu_card: 4090D
   cpu_size: 112
   selector: user=zhenqing
