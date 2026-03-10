@@ -46,6 +46,7 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
 
     dataset_root_dir = cfg.dataset_rootpath
     output_path = cfg.output.path
+    video_size = cfg.video_size
     workers = cfg.parallel.workers
 
     os.makedirs(output_path, exist_ok=True)
@@ -54,7 +55,8 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
         exe_cmd_str = f"python {cfg.task_script} \
                         --test_data_dir {dataset_root_dir} \
                         --video_resolution 720p \
-                        --video_size 512 512 \
+                        --video_size {video_size} {video_size} \
+                        --video_length 81 \
                         --start_index {start} \
                         --end_index {end+1} \
                         --output_dir {output_path} "                   
@@ -73,12 +75,12 @@ def submit_job(cfg: DictConfig, start: int, end: int, task_id: int) -> None:
 
     command = arena_commands + " " + script_commands
     log.info(f"Running command: {command}")
-    # os.system(command)
+    os.system(command)
 
 
-@hydra.main(version_base="1.2", config_path="./configs", config_name="inference_spatialvideo_dataset_h20.yaml")
+@hydra.main(version_base="1.2", config_path="./configs", config_name="inference_re10k_dataset_h20.yaml")
 def main_dispatcher(cfg: DictConfig) -> None:
-    dataset_processed_meta_filepath = "/data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/spatialvideo_test/test_scenes.csv"
+    dataset_processed_meta_filepath = "/data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/re10k_test/test_scenes.csv"
     metadata = pd.read_csv(dataset_processed_meta_filepath)
     num_rooms = len(metadata)
 

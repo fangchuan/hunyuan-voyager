@@ -134,12 +134,24 @@ def create_video_input(
         depth[mask] = 1 / (depth[mask] + 1e-6)
         depth_values = depth[mask]
         
-        min_percentile = np.percentile(depth_values, 2)
-        max_percentile = np.percentile(depth_values, 98)
+        if len(depth_values) == 0:
+            min_percentile = 0.0
+            max_percentile = 1.0
+        else:
+            min_percentile = np.percentile(depth_values, 2)
+            max_percentile = np.percentile(depth_values, 98)
+            
         value_list.append((min_percentile, max_percentile))
 
-        depth[mask] = (depth[mask] - min_percentile) / (max_percentile - min_percentile)
-        depth[~mask] = depth[mask].min()
+        if len(depth_values) > 0 and max_percentile > min_percentile:
+            depth[mask] = (depth[mask] - min_percentile) / (max_percentile - min_percentile)
+        elif len(depth_values) > 0:
+            depth[mask] = 0.0
+            
+        if len(depth_values) > 0:
+            depth[~mask] = depth[mask].min()
+        else:
+            depth[~mask] = 0.0
         
 
         # resize to 512x512

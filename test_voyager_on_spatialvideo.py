@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--test_data_dir", type=str, default="/data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/spatialvideo_test")
     parser.add_argument("--video_resolution", type=str, default="720p")
     parser.add_argument("--video_size", type=int, nargs="+", default=(512, 512))
+    parser.add_argument("--video_length", type=int, default=81)
     parser.add_argument("--infer_steps", type=int, default=50)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--start_index", type=int, default=0)
@@ -29,6 +30,7 @@ if __name__ == "__main__":
     args = parse_args()
     test_data_dir = args.test_data_dir
     video_resolution = args.video_resolution
+    video_len = args.video_length
     infer_steps = args.infer_steps
     seed = args.seed
     curr_date_time = datetime.now().strftime("%Y%m%d")
@@ -68,6 +70,7 @@ if __name__ == "__main__":
         voyager_cmd_lst.append("--i2v_stability")
         voyager_cmd_lst.append(f"--i2v_resolution {video_resolution}")
         voyager_cmd_lst.append(f"--video_size 512 512")
+        voyager_cmd_lst.append(f"--video_length {video_len}")
         voyager_cmd_lst.append(f"--infer_steps {infer_steps}")
         voyager_cmd_lst.append("--flow_reverse")
         voyager_cmd_lst.append("--flow_shift 7.0")

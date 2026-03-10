@@ -1,14 +1,14 @@
-dataset_rootpath: /data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/spatialvideo_test
+dataset_rootpath: /data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/examples/re10k_test
 test_split_file: /data-nas/data/dataset/open_source/RealEstate10K/DFoT_processed_data/datasets/real-estate-10k/test_256_150/process_re10k_wan_vace_data/metadata_wan_funcontrol_captioned.csv
 checkpoint_path: /data-nas/data/experiments/zhenqing/DiffSynth-Studio/experiments/20260216_002751_functrl_14Blora_depthcat_mixed_256/step-4000.safetensors
 depth_concat_type: width_wise
 finetune_mode: lora
-video_size: 512
+video_size: 256
 wan_version: 14B
 
 owner: zhenqing
 task_script: test_voyager_on_spatialvideo.py
-task_name: spatialvideo-voyager-infer
+task_name: re10k-voyager-infer
 resources:
   gpus: 1
   cpu: 22
@@ -37,6 +37,6 @@ parallel:
 
 
 output:
-  path: /data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/results_spatialvideo
+  path: /data-nas/data/experiments/zhenqing/HunyuanWorld-Voyager/results_re10k
   format: txt
   overwrite: true
